@@ -5,12 +5,19 @@ __pycache__/
 
 # C extensions
 *.so
-
+# Data files and local databases
+*.dat
+*.data
+*.db
+*.sqlite
+*.sqlite3
+data/*.db
+data/*.sqlite3
+health.db
 # Distribution / packaging
 .Python
 build/
 develop-eggs/
-dist/
 downloads/
 eggs/
 .eggs/

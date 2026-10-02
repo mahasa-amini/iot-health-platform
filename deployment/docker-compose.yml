@@ -6,3 +6,79 @@ services:
       - "1883:1883"
     volumes:
       - ./mqtt-broker/mosquitto.conf:/mosquitto/config/mosquitto.conf
+
+  health-catalog:
+    build: ../services/health-catalog
+    container_name: health-catalog
+    ports:
+      - "8001:8000"
+    restart: unless-stopped
+
+  data-storage:
+    build:
+      context: ../services/data-storage
+      dockerfile: Dockerfile
+    container_name: data-storage
+    environment:
+      - MQTT_HOST=mqtt-broker
+      - MQTT_PORT=1883
+      - DB_PATH=/app/data/health.db
+      - HEALTH_CATALOG_URL=http://health-catalog:8000
+    ports:
+      - "8003:8003"
+    volumes:
+      - ../data:/app/data
+    depends_on:
+      - health-catalog
+      - mqtt-broker
+
+
+  dashboard-backend:
+    build: ../services/dashboard-backend
+    container_name: dashboard-backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ../data:/app/data
+    depends_on:
+      - health-catalog
+      - data-storage
+      - mqtt-broker
+      
+
+  risk_analysis:
+    build: ../services/risk_analysis
+    container_name: risk-analysis
+    environment:
+      - MQTT_HOST=mqtt-broker
+      - MQTT_PORT=1883
+      - HEALTH_CATALOG_URL=http://health-catalog:8000
+    depends_on:
+      - health-catalog
+      - mqtt-broker
+      - data-storage
+      
+
+  alert_notification:
+    build: ../services/alert_notification
+    container_name: alert-notification
+    environment:
+      - MQTT_HOST=mqtt-broker
+      - MQTT_PORT=1883
+      - HEALTH_CATALOG_URL=http://health-catalog:8000
+    depends_on:
+      - health-catalog
+      - mqtt-broker
+      - data-storage
+      
+  wristband-simulator:
+    build: ../services/wristband-simulator
+    container_name: wristband-simulator
+    environment:
+      - MQTT_HOST=mqtt-broker
+      - MQTT_PORT=1883
+      - DATA_STORAGE_URL=http://data-storage:8003
+    depends_on:
+      - mqtt-broker
+      - data-storage
+

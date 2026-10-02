@@ -1,44 +1,124 @@
-import time
 import json
+import time
 import random
-from datetime import datetime
-import paho.mqtt.client as mqtt
+import os
+import requests
+from datetime import datetime, timezone
+import paho.mqtt.publish as publish
 
-BROKER_HOST = "127.0.0.1"
-BROKER_PORT = 1883
-TOPIC = "health/vitals"
+# -----------------------------
+# ENV CONFIG (Docker-friendly)
+# -----------------------------
+MQTT_HOST = os.getenv("MQTT_HOST", "mqtt-broker")
+MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
+DATA_STORAGE_URL = os.getenv("DATA_STORAGE_URL", "http://data-storage:8003")
 
-def on_connect(client, userdata, flags, rc):
-    print("on_connect called, rc =", rc)
+PUBLISH_INTERVAL_SEC = 5
 
-client = mqtt.Client(
-    client_id="wristband-simulator",
-    protocol=mqtt.MQTTv311   # 👈 خیلی مهم
-)
+# Distribution
+NORMAL_PROB = 0.95
+WARNING_PROB = 0.03
+CRITICAL_PROB = 0.02
 
-client.on_connect = on_connect
+# -----------------------------
+# STANDARD Thresholds only
+# (Wristband is hardware-agnostic)
+# -----------------------------
+THRESHOLDS = {
+    "hr": {
+        "NORMAL": (60, 100),
+        "WARNING": (100, 120),
+        "CRITICAL": (120, 160)
+    },
+    "spo2": {
+        "NORMAL": (95, 100),
+        "WARNING": (90, 95),
+        "CRITICAL": (85, 90)
+    },
+    "temperature": {
+        "NORMAL": (36.0, 37.5),
+        "WARNING": (37.5, 38.5),
+        "CRITICAL": (38.5, 39.5)
+    },
+    "battery": {
+        "NORMAL": (50, 100),
+        "WARNING": (20, 50),
+        "CRITICAL": (0, 20)
+    }
+}
 
-print("Connecting to broker...")
-client.connect(BROKER_HOST, BROKER_PORT, 60)
+# -----------------------------
+# Helpers
+# -----------------------------
+def choose_level():
+    r = random.random()
+    if r < NORMAL_PROB:
+        return "NORMAL"
+    elif r < NORMAL_PROB + WARNING_PROB:
+        return "WARNING"
+    else:
+        return "CRITICAL"
 
-# 👇 مهم: loop_forever به‌جای loop_start
-client.loop_start()
 
-time.sleep(2)  # 👈 فقط همین، بدون while
+def generate_value(vital):
+    level = choose_level()
+    low, high = THRESHOLDS[vital][level]
 
-print("Start publishing...")
+    if vital == "temperature":
+        return round(random.uniform(low, high), 1)
+
+    return random.randint(int(low), int(high))
+
+
+def fetch_active_assignments():
+    try:
+        resp = requests.get(f"{DATA_STORAGE_URL}/api/v1/assignments/active", timeout=5)
+        resp.raise_for_status()
+        return resp.json()
+    except Exception as e:
+        print(f"[SIM][WARN] Failed to fetch assignments: {e}")
+        return []
+
+
+# -----------------------------
+# Main loop
+# -----------------------------
+print("[SIM] Wristband Simulator started (STANDARD profile only)")
 
 while True:
-    data = {
-        "patient_id": "P001",
-        "timestamp": datetime.utcnow().isoformat(),
-        "heart_rate": random.randint(60, 110),
-        "spo2": random.randint(92, 100),
-        "temperature": round(random.uniform(36.0, 38.5), 1)
-    }
+    print("[SIM] Fetching active assignments...")
+    assignments = fetch_active_assignments()
+    print(f"[SIM] Found {len(assignments)} active assignments")
+    if not assignments:
+        print("[SIM] No active assignments found")
+        time.sleep(PUBLISH_INTERVAL_SEC)
+        continue
+    print("[SIM] Publishing vitals...")
+    now_iso = datetime.now(timezone.utc).isoformat()
 
-    payload = json.dumps(data)
-    client.publish(TOPIC, payload, qos=1)
-    print("Published:", payload)
+    for a in assignments:
+        wristband_id = a["wristband_id"]
 
-    time.sleep(3)
+        vitals_payload = {
+            "wristband_id": wristband_id,
+            "measured_at": now_iso,
+            "heart_rate": generate_value("hr"),
+            "spo2": generate_value("spo2"),
+            "temperature": generate_value("temperature"),
+            "motion": round(random.uniform(0.0, 1.5), 2),
+            "battery_level": generate_value("battery"),
+        }
+
+        topic = f"wristbands/{wristband_id}/vitals"
+
+        publish.single(
+            topic=topic,
+            payload=json.dumps(vitals_payload),
+            hostname=MQTT_HOST,
+            port=MQTT_PORT,
+            qos=0
+        )
+
+        print(f"[SIM] Published → {topic}")
+
+    time.sleep(PUBLISH_INTERVAL_SEC)

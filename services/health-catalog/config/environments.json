@@ -1,0 +1,78 @@
+{
+  "metadata": {
+    "description": "Environment-specific infrastructure configuration (local and docker only)",
+    "owner": "health-catalog",
+    "used_by": [
+      "risk-analysis-service",
+      "alert-notification-service",
+      "data-storage-service",
+      "dashboard-backend",
+      "wristband-simulator"
+    ],
+    "version": "1.0"
+  },
+
+  "active_environment": "docker",
+
+  "environments": {
+    "local": {
+      "description": "Local development environment (services running directly on host machine)",
+      "mqtt": {
+        "host": "localhost",
+        "port": 1883
+      },
+      "services": {
+        "health-catalog": {
+          "host": "localhost",
+          "port": 8001
+        },
+        "risk-analysis-service": {
+          "host": "localhost",
+          "port": null
+        },
+        "alert-notification-service": {
+          "host": "localhost",
+          "port": null
+        },
+        "data-storage-service": {
+          "host": "localhost",
+          "port": 8003
+        },
+        "dashboard-backend": {
+          "host": "localhost",
+          "port": 8000
+        }
+      }
+    },
+
+    "docker": {
+      "description": "Docker Compose environment (container-to-container communication)",
+      "mqtt": {
+        "host": "mqtt-broker",
+        "port": 1883
+      },
+      "services": {
+        "health-catalog": {
+          "host": "health-catalog",
+          "port": 8001
+        },
+        "risk-analysis-service": {
+          "host": "risk-analysis",
+          "port": null
+        },
+        "alert-notification-service": {
+          "host": "alert-notification",
+          "port": null
+        },
+        "data-storage-service": {
+          "host": "data-storage",
+          "port": 8003
+        },
+        "dashboard-backend": {
+          "host": "dashboard-backend",
+          "port": 8000
+        }
+      }
+    }
+  }
+}
