@@ -17,3 +17,11 @@ app.include_router(mqtt_router, prefix="/config/mqtt", tags=["MQTT"])
 app.include_router(services_router, prefix="/registry/services", tags=["Services"])
 app.include_router(alerts_router, prefix="/config/alerts", tags=["Alerts"])
 app.include_router(environments_router, prefix="/config/environments", tags=["Environments"])
+
+
+@app.get("/health", tags=["Health"])
+def health_check():
+    return {
+        "status": "healthy",
+        "service": "health-catalog",
+    }

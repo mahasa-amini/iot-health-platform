@@ -21,3 +21,29 @@ app.include_router(patients_router, prefix="/api/v1")
 app.include_router(dashboard_router, prefix="/api/v1")
 app.include_router(wristbands_router, prefix="/api/v1")
 
+
+
+@app.get("/health", tags=["health"])
+def health_check():
+    from fastapi import HTTPException
+    from sqlalchemy import text
+    from storage.local import engine
+
+    try:
+        with engine.connect() as connection:
+            connection.execute(text("SELECT 1"))
+    except Exception:
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "status": "unhealthy",
+                "service": "data-storage",
+                "database": "unavailable",
+            },
+        )
+
+    return {
+        "status": "healthy",
+        "service": "data-storage",
+        "database": "connected",
+    }

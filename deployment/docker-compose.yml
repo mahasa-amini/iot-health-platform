@@ -6,6 +6,12 @@ services:
       - "1883:1883"
     volumes:
       - ./mqtt-broker/mosquitto.conf:/mosquitto/config/mosquitto.conf
+    healthcheck:
+      test: ["CMD-SHELL", "mosquitto_sub -h localhost -p 1883 -t '$$SYS/broker/version' -C 1 -W 3 >/dev/null 2>&1"]
+      interval: 5s
+      timeout: 4s
+      retries: 5
+      start_period: 5s
 
   health-catalog:
     build: ../services/health-catalog
@@ -13,6 +19,18 @@ services:
     ports:
       - "8001:8000"
     restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=3)"
+        ]
+      interval: 5s
+      timeout: 4s
+      retries: 5
+      start_period: 5s
 
   data-storage:
     build:
@@ -29,9 +47,22 @@ services:
     volumes:
       - ../data:/app/data
     depends_on:
-      - health-catalog
-      - mqtt-broker
-
+      health-catalog:
+        condition: service_healthy
+      mqtt-broker:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8003/health', timeout=3)"
+        ]
+      interval: 5s
+      timeout: 4s
+      retries: 5
+      start_period: 5s
 
   dashboard-backend:
     build: ../services/dashboard-backend
@@ -41,10 +72,12 @@ services:
     volumes:
       - ../data:/app/data
     depends_on:
-      - health-catalog
-      - data-storage
-      - mqtt-broker
-      
+      health-catalog:
+        condition: service_healthy
+      data-storage:
+        condition: service_healthy
+      mqtt-broker:
+        condition: service_healthy
 
   risk_analysis:
     build: ../services/risk_analysis
@@ -54,10 +87,12 @@ services:
       - MQTT_PORT=1883
       - HEALTH_CATALOG_URL=http://health-catalog:8000
     depends_on:
-      - health-catalog
-      - mqtt-broker
-      - data-storage
-      
+      health-catalog:
+        condition: service_healthy
+      mqtt-broker:
+        condition: service_healthy
+      data-storage:
+        condition: service_healthy
 
   alert_notification:
     build: ../services/alert_notification
@@ -67,10 +102,13 @@ services:
       - MQTT_PORT=1883
       - HEALTH_CATALOG_URL=http://health-catalog:8000
     depends_on:
-      - health-catalog
-      - mqtt-broker
-      - data-storage
-      
+      health-catalog:
+        condition: service_healthy
+      mqtt-broker:
+        condition: service_healthy
+      data-storage:
+        condition: service_healthy
+
   wristband-simulator:
     build: ../services/wristband-simulator
     container_name: wristband-simulator
@@ -79,6 +117,7 @@ services:
       - MQTT_PORT=1883
       - DATA_STORAGE_URL=http://data-storage:8003
     depends_on:
-      - mqtt-broker
-      - data-storage
-
+      mqtt-broker:
+        condition: service_healthy
+      data-storage:
+        condition: service_healthy

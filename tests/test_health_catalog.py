@@ -116,3 +116,13 @@ def test_get_environments():
     assert "local" in data["environments"]
     assert "docker" in data["environments"]
     assert data["environments"]["docker"]["mqtt"]["host"] == "mqtt-broker"
+
+
+def test_health():
+    res = client.get("/health")
+
+    assert res.status_code == 200
+    assert res.json() == {
+        "status": "healthy",
+        "service": "health-catalog",
+    }
