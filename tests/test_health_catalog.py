@@ -1,5 +1,6 @@
 import re
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -21,6 +22,10 @@ def assert_standard_response(payload: dict):
     assert "timestamp" in payload
     assert isinstance(payload["timestamp"], str)
     assert re.match(r"\d{4}-\d{2}-\d{2}", payload["timestamp"])
+
+    parsed_timestamp = datetime.fromisoformat(payload["timestamp"])
+    assert parsed_timestamp.tzinfo is not None
+    assert parsed_timestamp.utcoffset() == timezone.utc.utcoffset(None)
 
 
 def test_openapi_available():

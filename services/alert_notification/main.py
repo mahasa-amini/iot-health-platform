@@ -1,7 +1,7 @@
 import json
 import requests
 import paho.mqtt.client as mqtt
-from datetime import datetime
+from datetime import datetime, timezone
 import time
 
 # ----------------------------------
@@ -80,8 +80,8 @@ def build_descriptions(event: dict):
 # ----------------------------------
 # MQTT callbacks
 # ----------------------------------
-def on_connect(client, userdata, flags, rc):
-    print(f"[ALERT] Connected to MQTT broker (rc={rc})")
+def on_connect(client, userdata, flags, reason_code, properties):
+    print(f"[ALERT] Connected to MQTT broker (rc={reason_code})")
 
     risk_topic = MQTT_TOPICS["mqtt_topics"]["risk_events"]["subscribe_pattern"]
     client.subscribe(risk_topic, qos=1)
@@ -115,7 +115,7 @@ def on_message(client, userdata, msg):
         "full_description": full_desc,
 
         "threshold_profile": event.get("threshold_profile"),
-        "generated_at": datetime.utcnow().isoformat()
+        "generated_at": datetime.now(timezone.utc).isoformat()
     }
 
     alert_topic = MQTT_TOPICS["mqtt_topics"]["alerts"]["topic"]
@@ -146,7 +146,7 @@ def main():
     mqtt_conf = ENV_CONFIG["environments"][active_env]["mqtt"]
 
     # MQTT client
-    client = mqtt.Client(client_id="alert-notification-service")
+    client = mqtt.Client(callback_api_version=mqtt.CallbackAPIVersion.VERSION2, client_id="alert-notification-service")
     client.on_connect = on_connect
     client.on_message = on_message
 

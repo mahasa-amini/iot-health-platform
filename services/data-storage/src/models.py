@@ -8,7 +8,7 @@ from sqlalchemy import (
     CheckConstraint,
 )
 from storage.base import Base
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 # ----------------------------
@@ -21,7 +21,7 @@ class Wristband(Base):
     created_at = Column(
         DateTime,
         nullable=False,
-        default=datetime.utcnow
+        default=lambda: datetime.now(timezone.utc)
     )
 
 
@@ -58,7 +58,7 @@ class WristbandAssignment(Base):
     patient_id = Column(
         Integer, ForeignKey("PATIENT.patient_id"), nullable=False
     )
-    start_date = Column(DateTime, nullable=False, default=datetime.utcnow)
+    start_date = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
     end_date = Column(DateTime)
 
 
@@ -101,7 +101,7 @@ class Alert(Base):
     )
 
     # Timestamps
-    generated_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    generated_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
     acknowledged_at = Column(DateTime)
     reviewed_at = Column(DateTime)
 

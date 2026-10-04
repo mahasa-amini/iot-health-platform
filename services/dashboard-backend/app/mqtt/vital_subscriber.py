@@ -23,7 +23,7 @@ class VitalMQTTSubscriber:
         mqtt_topics = config["mqtt_topics"]
         self.vitals_topic = mqtt_topics["vitals"]["subscribe_pattern"]
 
-        self._client = mqtt.Client(client_id="dashboard-backend-vitals")
+        self._client = mqtt.Client(callback_api_version=mqtt.CallbackAPIVersion.VERSION2, client_id="dashboard-backend-vitals")
 
         #  event loop اصلی FastAPI
         self.loop = asyncio.get_event_loop()
@@ -31,13 +31,13 @@ class VitalMQTTSubscriber:
     # ----------------------------------
     # MQTT callbacks
     # ----------------------------------
-    def _on_connect(self, client, userdata, flags, rc):
-        if rc == 0:
+    def _on_connect(self, client, userdata, flags, reason_code, properties):
+        if reason_code == 0:
             print("[VITAL-MQTT] connected to broker ✅")
             client.subscribe(self.vitals_topic, qos=0)
             print(f"[VITAL-MQTT] subscribed to {self.vitals_topic}")
         else:
-            print(f"[VITAL-MQTT] connection failed rc={rc} ❌")
+            print(f"[VITAL-MQTT] connection failed rc={reason_code} ❌")
 
     def _on_message(self, client, userdata, msg):
         print(f"[VITAL-MQTT] message received on {msg.topic}")

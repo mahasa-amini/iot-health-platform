@@ -41,13 +41,13 @@ class AlertMQTTSubscriber:
         # --------------------------------------------------
         # MQTT client
         # --------------------------------------------------
-        self._client = mqtt.Client(client_id="dashboard-backend")
+        self._client = mqtt.Client(callback_api_version=mqtt.CallbackAPIVersion.VERSION2, client_id="dashboard-backend")
 
     # ----------------------------------
     # MQTT callbacks
     # ----------------------------------
-    def _on_connect(self, client, userdata, flags, rc):
-        if rc == 0:
+    def _on_connect(self, client, userdata, flags, reason_code, properties):
+        if reason_code == 0:
             print("[DASHBOARD-MQTT] connected to broker ✅")
 
             client.subscribe(self.alerts_topic, qos=1)
@@ -55,7 +55,7 @@ class AlertMQTTSubscriber:
                 f"[DASHBOARD-MQTT] subscribed to topic: {self.alerts_topic}"
             )
         else:
-            print(f"[DASHBOARD-MQTT] connection failed rc={rc} ❌")
+            print(f"[DASHBOARD-MQTT] connection failed rc={reason_code} ❌")
 
     def _on_message(self, client, userdata, msg):
         print(f"[DASHBOARD-MQTT] alert received on {msg.topic}")

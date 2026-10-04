@@ -50,7 +50,7 @@ class MQTTClient:
         flags = self.config.get("feature_flags", {})
         self.strict_json_validation = bool(flags.get("enable_strict_schema_validation", True))
 
-        self._client = mqtt.Client(client_id="data-storage-service")
+        self._client = mqtt.Client(callback_api_version=mqtt.CallbackAPIVersion.VERSION2, client_id="data-storage-service")
 
     # ----------------------------
     # Public API
@@ -71,17 +71,17 @@ class MQTTClient:
     # ----------------------------
     # MQTT callbacks
     # ----------------------------
-    def _on_connect(self, client, userdata, flags, rc):
-        if rc == 0:
+    def _on_connect(self, client, userdata, flags, reason_code, properties):
+        if reason_code == 0:
             print("[MQTT] connected ✅")
             client.subscribe(self.vitals_topic, qos=0)
             client.subscribe(self.alerts_topic, qos=1)
             print("[MQTT] subscribed ✅")
         else:
-            print(f"[MQTT] connect failed rc={rc} ❌")
+            print(f"[MQTT] connect failed rc={reason_code} ❌")
 
-    def _on_disconnect(self, client, userdata, rc):
-        print(f"[MQTT] disconnected rc={rc}")
+    def _on_disconnect(self, client, userdata, disconnect_flags, reason_code, properties):
+        print(f"[MQTT] disconnected rc={reason_code}")
 
     def _on_message(self, client, userdata, msg):
         topic = msg.topic

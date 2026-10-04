@@ -750,7 +750,7 @@ class LocalStorage(StorageBackend):
     @staticmethod
     def _parse_datetime(value):
         if not value:
-            return datetime.utcnow()
+            return datetime.now(timezone.utc)
 
         if isinstance(value, datetime):
             return value
@@ -758,4 +758,4 @@ class LocalStorage(StorageBackend):
         try:
             return datetime.fromisoformat(value.replace("Z", "+00:00"))
         except Exception:
-            return datetime.utcnow()
+            return datetime.now(timezone.utc)

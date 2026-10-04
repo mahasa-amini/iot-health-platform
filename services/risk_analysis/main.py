@@ -1,7 +1,7 @@
 import json
 import requests
 import paho.mqtt.client as mqtt
-from datetime import datetime
+from datetime import datetime, timezone
 
 # ----------------------------------
 # Health Catalog
@@ -73,8 +73,8 @@ def get_profile_for_wristband(wristband_id: int) -> str:
 # ----------------------------------
 # MQTT callbacks
 # ----------------------------------
-def on_connect(client, userdata, flags, rc):
-    print(f"[RISK] Connected to MQTT broker (rc={rc})")
+def on_connect(client, userdata, flags, reason_code, properties):
+    print(f"[RISK] Connected to MQTT broker (rc={reason_code})")
 
     vitals_topic = MQTT_TOPICS["mqtt_topics"]["vitals"]["subscribe_pattern"]
     client.subscribe(vitals_topic, qos=0)
@@ -138,7 +138,7 @@ def on_message(client, userdata, msg):
         "threshold_profile": profile,
         "vital": breached_metric,
         "value": breached_value,
-        "generated_at": datetime.utcnow().isoformat()
+        "generated_at": datetime.now(timezone.utc).isoformat()
     }
 
     topic = MQTT_TOPICS["mqtt_topics"]["risk_events"]["template"].format(
@@ -166,7 +166,7 @@ def main():
     mqtt_conf = ENV_CONFIG["environments"][active_env]["mqtt"]
 
     # MQTT client
-    client = mqtt.Client(client_id="risk-analysis-service")
+    client = mqtt.Client(callback_api_version=mqtt.CallbackAPIVersion.VERSION2, client_id="risk-analysis-service")
     client.on_connect = on_connect
     client.on_message = on_message
 
