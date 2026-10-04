@@ -155,9 +155,14 @@ class MQTTClient:
     def _handle_alert(self, payload: Dict[str, Any]) -> None:
         print("[ALERT] received:", payload)
 
-        assignment_id = payload.get("assignment_id")
+        wristband_id = payload.get("wristband_id")
+        if wristband_id is None:
+            print("[ALERT] wristband_id missing, drop alert")
+            return
+
+        assignment_id = self._resolve_assignment_id(int(wristband_id))
         if assignment_id is None:
-            print("[ALERT] assignment_id missing, drop alert")
+            print(f"[ALERT] No active assignment for wristband {wristband_id}")
             return
 
         # Minimal validation (schema enforced elsewhere)

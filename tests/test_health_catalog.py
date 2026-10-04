@@ -1,37 +1,20 @@
-# tests/test_health_catalog.py
-
-import sys
 import re
+import sys
 from pathlib import Path
 
 from fastapi.testclient import TestClient
 
-# ------------------------------------------------------------------
-# Make health-catalog service importable for tests
-# ------------------------------------------------------------------
-
-ROOT = Path(__file__).resolve().parents[1]   # iot-health-platform
+ROOT = Path(__file__).resolve().parents[1]
 HC_DIR = ROOT / "services" / "health-catalog"
 
 sys.path.insert(0, str(HC_DIR))
 
-from src.main import app  # noqa
+from src.main import app  # noqa: E402
 
 client = TestClient(app)
 
-# ------------------------------------------------------------------
-# Helpers
-# ------------------------------------------------------------------
 
 def assert_standard_response(payload: dict):
-    """
-    Standard response contract:
-    {
-      "status": "success",
-      "data": {...},
-      "timestamp": "ISO-8601 string"
-    }
-    """
     assert isinstance(payload, dict)
     assert payload.get("status") == "success"
     assert "data" in payload
@@ -39,10 +22,6 @@ def assert_standard_response(payload: dict):
     assert isinstance(payload["timestamp"], str)
     assert re.match(r"\d{4}-\d{2}-\d{2}", payload["timestamp"])
 
-
-# ------------------------------------------------------------------
-# Sanity / OpenAPI
-# ------------------------------------------------------------------
 
 def test_openapi_available():
     res = client.get("/openapi.json")
@@ -53,12 +32,8 @@ def test_openapi_available():
     assert data["info"]["title"] == "Health Catalog Service"
 
 
-# ------------------------------------------------------------------
-# GET /thresholds
-# ------------------------------------------------------------------
-
 def test_get_thresholds():
-    res = client.get("/thresholds")
+    res = client.get("/config/thresholds/")
     assert res.status_code == 200
 
     payload = res.json()
@@ -66,28 +41,52 @@ def test_get_thresholds():
 
     data = payload["data"]
 
-    # Your API returns thresholds under "global"
-    assert "global" in data
-    global_thresholds = data["global"]
+    assert data["defaults"]["profile"] == "STANDARD"
+    assert "profiles" in data
+    assert "STANDARD" in data["profiles"]
+    assert "CARDIAC" in data["profiles"]
 
-    # expected metrics
-    assert "hr" in global_thresholds
-    assert "spo2" in global_thresholds
-    assert "temperature" in global_thresholds
-
-    # expected levels for each metric
-    for metric in ["hr", "spo2", "temperature"]:
-        assert "normal" in global_thresholds[metric]
-        assert "warning" in global_thresholds[metric]
-        assert "critical" in global_thresholds[metric]
+    for metric in ["hr", "spo2", "temperature", "battery"]:
+        assert metric in data["profiles"]["STANDARD"]
+        assert "NORMAL" in data["profiles"]["STANDARD"][metric]
+        assert "WARNING" in data["profiles"]["STANDARD"][metric]
+        assert "CRITICAL" in data["profiles"]["STANDARD"][metric]
 
 
-# ------------------------------------------------------------------
-# GET /topics
-# ------------------------------------------------------------------
+def test_get_mqtt_topics():
+    res = client.get("/config/mqtt/topics")
+    assert res.status_code == 200
 
-def test_get_topics():
-    res = client.get("/topics")
+    payload = res.json()
+    assert_standard_response(payload)
+
+    topics = payload["data"]["mqtt_topics"]
+
+    assert topics["vitals"]["subscribe_pattern"] == "wristbands/+/vitals"
+    assert topics["risk_events"]["subscribe_pattern"] == "health/risk/+"
+    assert topics["alerts"]["topic"] == "health/alerts"
+
+
+def test_get_services():
+    res = client.get("/registry/services/")
+    assert res.status_code == 200
+
+    payload = res.json()
+    assert_standard_response(payload)
+
+    services = payload["data"]["services"]
+    names = {service["name"] for service in services}
+
+    assert "health-catalog" in names
+    assert "risk-analysis-service" in names
+    assert "alert-notification-service" in names
+    assert "data-storage-service" in names
+    assert "dashboard-backend" in names
+    assert "wristband-simulator" in names
+
+
+def test_get_alert_config():
+    res = client.get("/config/alerts/")
     assert res.status_code == 200
 
     payload = res.json()
@@ -95,57 +94,25 @@ def test_get_topics():
 
     data = payload["data"]
 
-    assert "mqtt" in data
-    mqtt = data["mqtt"]
+    assert "THRESHOLD_BREACH" in data["alert_types"]
+    assert data["lifecycle"]["initial_status"] == "JUST_GENERATED"
+    assert "required_fields" in data["payload_contract"]
 
-    assert "base" in mqtt
-    assert "subscriptions" in mqtt
-
-    base = mqtt["base"]
-    assert "vitals" in base
-    assert "alerts" in base
-    assert "system" in base
+    required_fields = data["payload_contract"]["required_fields"]
+    assert "wristband_id" in required_fields
+    assert "assignment_id" not in required_fields
 
 
-# ------------------------------------------------------------------
-# GET /endpoints
-# ------------------------------------------------------------------
-
-def test_get_endpoints():
-    res = client.get("/endpoints")
+def test_get_environments():
+    res = client.get("/config/environments/")
     assert res.status_code == 200
 
     payload = res.json()
     assert_standard_response(payload)
 
     data = payload["data"]
-    assert "services" in data
 
-    services = data["services"]
-    # Check expected services exist (adjust names if your endpoints.json differs)
-    assert "health_catalog" in services
-    assert "risk_analysis" in services
-
-
-# ------------------------------------------------------------------
-# GET /patients/{id}
-# ------------------------------------------------------------------
-
-def test_get_patient_valid_id():
-    res = client.get("/patients/1")
-    assert res.status_code == 200
-
-    payload = res.json()
-    assert_standard_response(payload)
-
-    patient = payload["data"]
-    assert patient["patientId"] == 1
-    assert "name" in patient
-    assert "wristbandId" in patient
-
-
-def test_get_patient_not_found():
-    res = client.get("/patients/999")
-    assert res.status_code == 404
-    body = res.json()
-    assert "detail" in body
+    assert data["active_environment"] in data["environments"]
+    assert "local" in data["environments"]
+    assert "docker" in data["environments"]
+    assert data["environments"]["docker"]["mqtt"]["host"] == "mqtt-broker"

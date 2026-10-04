@@ -103,7 +103,7 @@ def on_message(client, userdata, msg):
 
     # Final alert payload (UI + Storage ready)
     alert = {
-        "assignment_id": event.get("wristband_id"),  # DB will resolve mapping
+        "wristband_id": event.get("wristband_id"),
         "alert_type": event.get("alert_type"),
         "severity": event.get("severity"),
         "status": ALERT_CONFIG["lifecycle"]["initial_status"],

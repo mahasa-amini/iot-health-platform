@@ -45,7 +45,7 @@
 
   "payload_contract": {
     "required_fields": [
-      "assignment_id",
+      "wristband_id",
       "alert_type",
       "severity",
       "status",
