@@ -1,4 +1,5 @@
 import json
+import os
 import requests
 import paho.mqtt.client as mqtt
 from datetime import datetime, timezone
@@ -7,7 +8,10 @@ import time
 # ----------------------------------
 # Health Catalog endpoints
 # ----------------------------------
-HEALTH_CATALOG_URL = "http://health-catalog:8000"
+HEALTH_CATALOG_URL = os.getenv(
+    "HEALTH_CATALOG_URL",
+    "http://health-catalog:8000",
+)
 
 MQTT_TOPICS_ENDPOINT = "/config/mqtt/topics"
 ALERTS_ENDPOINT = "/config/alerts"

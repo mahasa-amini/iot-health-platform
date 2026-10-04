@@ -5,10 +5,11 @@ from typing import List, Dict, Optional
 from app.services.storage import Storage
 
 
-DATA_STORAGE_BASE_URL = os.getenv(
+DATA_STORAGE_URL = os.getenv(
     "DATA_STORAGE_URL",
-    "http://data-storage:8003/api/v1"
+    "http://data-storage:8003",
 )
+DATA_STORAGE_BASE_URL = f"{DATA_STORAGE_URL.rstrip('/')}/api/v1"
 
 
 class RESTStorageClient(Storage):

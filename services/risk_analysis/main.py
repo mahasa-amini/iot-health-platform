@@ -1,4 +1,5 @@
 import json
+import os
 import requests
 import paho.mqtt.client as mqtt
 from datetime import datetime, timezone
@@ -6,7 +7,10 @@ from datetime import datetime, timezone
 # ----------------------------------
 # Health Catalog
 # ----------------------------------
-HEALTH_CATALOG_URL = "http://health-catalog:8000"
+HEALTH_CATALOG_URL = os.getenv(
+    "HEALTH_CATALOG_URL",
+    "http://health-catalog:8000",
+)
 
 THRESHOLDS_ENDPOINT = "/config/thresholds"
 MQTT_TOPICS_ENDPOINT = "/config/mqtt/topics"
@@ -15,7 +19,11 @@ ENVIRONMENTS_ENDPOINT = "/config/environments"
 # ----------------------------------
 # Data Storage API
 # ----------------------------------
-DATA_STORAGE_BASE = "http://data-storage:8003"
+DATA_STORAGE_URL = os.getenv(
+    "DATA_STORAGE_URL",
+    "http://data-storage:8003",
+)
+DATA_STORAGE_BASE = DATA_STORAGE_URL
 ASSIGNMENT_ENDPOINT = "/api/v1/assignments/by-wristband/{}"
 
 # ----------------------------------

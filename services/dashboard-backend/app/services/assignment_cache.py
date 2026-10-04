@@ -1,7 +1,12 @@
+import os
 import requests
 from typing import Dict, Optional
 
-DATA_STORAGE_BASE = "http://data-storage:8003"
+DATA_STORAGE_URL = os.getenv(
+    "DATA_STORAGE_URL",
+    "http://data-storage:8003",
+)
+DATA_STORAGE_BASE = DATA_STORAGE_URL
 ASSIGNMENT_ENDPOINT = "/api/v1/assignments/by-wristband/{}"
 
 _assignment_cache: Dict[int, int] = {}

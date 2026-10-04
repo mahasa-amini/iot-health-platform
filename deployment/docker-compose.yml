@@ -67,6 +67,9 @@ services:
   dashboard-backend:
     build: ../services/dashboard-backend
     container_name: dashboard-backend
+    environment:
+      - HEALTH_CATALOG_URL=http://health-catalog:8000
+      - DATA_STORAGE_URL=http://data-storage:8003
     ports:
       - "8000:8000"
     volumes:
@@ -86,6 +89,7 @@ services:
       - MQTT_HOST=mqtt-broker
       - MQTT_PORT=1883
       - HEALTH_CATALOG_URL=http://health-catalog:8000
+      - DATA_STORAGE_URL=http://data-storage:8003
     depends_on:
       health-catalog:
         condition: service_healthy
