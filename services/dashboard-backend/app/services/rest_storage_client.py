@@ -90,12 +90,6 @@ class RESTStorageClient(Storage):
         reviewed_by: Optional[str] = None,
         clinical_note: Optional[str] = None,
     ) -> None:
-        Dr = "Dr. Moeini"
-        note = "Reviewed and acknowledged."
-        if reviewed_by is None:
-            reviewed_by = Dr
-        if clinical_note is None:
-            clinical_note = note
         resp = requests.post(
             f"{DATA_STORAGE_BASE_URL}/alerts/{alert_id}/acknowledge",
             json={
