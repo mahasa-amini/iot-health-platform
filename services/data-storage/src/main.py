@@ -4,6 +4,7 @@ import models  # noqa: F401  (register SQLAlchemy models)
 
 from mqtt_client import start_mqtt
 from config_loader import load_health_catalog_config
+from seed import seed_demo_data
 
 from api.app import app
 
@@ -27,6 +28,9 @@ if __name__ == "__main__":
     # Initialize database schema
     init_db()
     print("[MAIN] database initialized")
+
+    # Bootstrap demo data only when the database is fresh.
+    seed_demo_data()
 
     #  Load configuration from Health Catalog
     config = load_health_catalog_config()
