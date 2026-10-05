@@ -150,3 +150,100 @@ def test_reassignment_allowed_after_previous_assignment_ends(isolated_storage):
         session.close()
 
     assert active == [(2, 1)]
+
+
+def test_create_patient_rolls_back_when_wristband_assignment_fails(isolated_storage):
+    storage, SessionLocal = isolated_storage
+
+    session = SessionLocal()
+    try:
+        session.execute(
+            text("""
+                INSERT INTO WRISTBAND (wristband_id, created_at)
+                VALUES (1, CURRENT_TIMESTAMP)
+            """)
+        )
+        session.execute(
+            text("""
+                INSERT INTO PATIENT
+                    (patient_id, name, age, gender, phone, threshold_profile)
+                VALUES
+                    (1, 'Existing Patient', 40, 'FEMALE', NULL, 'STANDARD')
+            """)
+        )
+        session.commit()
+    finally:
+        session.close()
+
+    storage.assign_wristband(patient_id=1, wristband_id=1)
+
+    with pytest.raises(ValueError, match="already assigned"):
+        storage.create_patient(
+            {
+                "name": "Should Not Persist",
+                "age": 50,
+                "gender": "MALE",
+                "phone": None,
+                "threshold_profile": "STANDARD",
+                "wristband_id": 1,
+            }
+        )
+
+    session = SessionLocal()
+    try:
+        patient_count = session.execute(
+            text("""
+                SELECT COUNT(*)
+                FROM PATIENT
+                WHERE name = 'Should Not Persist'
+            """)
+        ).scalar_one()
+    finally:
+        session.close()
+
+    assert patient_count == 0
+
+
+def test_create_patient_commits_patient_and_wristband_together(isolated_storage):
+    storage, SessionLocal = isolated_storage
+
+    session = SessionLocal()
+    try:
+        session.execute(
+            text("""
+                INSERT INTO WRISTBAND (wristband_id, created_at)
+                VALUES (1, CURRENT_TIMESTAMP)
+            """)
+        )
+        session.commit()
+    finally:
+        session.close()
+
+    result = storage.create_patient(
+        {
+            "name": "New Patient",
+            "age": 35,
+            "gender": "FEMALE",
+            "phone": None,
+            "threshold_profile": "STANDARD",
+            "wristband_id": 1,
+        }
+    )
+
+    session = SessionLocal()
+    try:
+        row = session.execute(
+            text("""
+                SELECT p.name, wa.wristband_id
+                FROM PATIENT p
+                JOIN WRISTBAND_ASSIGNMENT wa
+                    ON wa.patient_id = p.patient_id
+                WHERE p.patient_id = :patient_id
+                  AND wa.end_date IS NULL
+            """),
+            {"patient_id": result["patient_id"]},
+        ).first()
+    finally:
+        session.close()
+
+    assert row == ("New Patient", 1)
