@@ -1,6 +1,6 @@
 import os
 import requests
-from typing import Dict, Optional
+from typing import Optional
 
 DATA_STORAGE_URL = os.getenv(
     "DATA_STORAGE_URL",
@@ -9,13 +9,8 @@ DATA_STORAGE_URL = os.getenv(
 DATA_STORAGE_BASE = DATA_STORAGE_URL
 ASSIGNMENT_ENDPOINT = "/api/v1/assignments/by-wristband/{}"
 
-_assignment_cache: Dict[int, int] = {}
-
 
 def get_patient_id_for_wristband(wristband_id: int) -> Optional[int]:
-    if wristband_id in _assignment_cache:
-        return _assignment_cache[wristband_id]
-
     try:
         resp = requests.get(
             DATA_STORAGE_BASE + ASSIGNMENT_ENDPOINT.format(wristband_id),
@@ -26,7 +21,6 @@ def get_patient_id_for_wristband(wristband_id: int) -> Optional[int]:
 
         patient_id = resp.json().get("patient_id")
         if patient_id is not None:
-            _assignment_cache[wristband_id] = patient_id
             return patient_id
 
     except Exception as e:
