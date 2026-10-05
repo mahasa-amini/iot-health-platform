@@ -409,19 +409,21 @@ class LocalStorage(StorageBackend):
 
             session.commit()
 
-                # row = session.execute(
-                #     text("""
-                #         SELECT
-                #             wristband_id,
-                #             created_at
-                #         FROM WRISTBAND
-                #         WHERE wristband_id = :wristband_id
-                #     """),
-                #     {"wristband_id": wristband_id}
-                # ).mappings().first()
+            row = session.execute(
+                text("""
+                    SELECT
+                        wristband_id,
+                        created_at
+                    FROM WRISTBAND
+                    WHERE wristband_id = :wristband_id
+                """),
+                {"wristband_id": wristband_id},
+            ).mappings().one()
 
-            return {"wristband_id": wristband_id,
-                 "created_at": datetime.now(timezone.utc)}
+            return {
+                "wristband_id": row["wristband_id"],
+                "created_at": row["created_at"],
+            }
 
         finally:
             session.close()
