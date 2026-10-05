@@ -629,7 +629,7 @@ class LocalStorage(StorageBackend):
                     SELECT COUNT(*)
                     FROM ALERT
                     WHERE status != 'ACKNOWLEDGED'
-                    AND severity = 'CRITICAL'
+                    AND severity = 'critical'
                 """)
             )
             return result.scalar_one()
@@ -691,7 +691,7 @@ class LocalStorage(StorageBackend):
                     JOIN WRISTBAND_ASSIGNMENT wa
                         ON a.assignment_id = wa.assignment_id
                     WHERE a.status != 'ACKNOWLEDGED'
-                    AND a.severity = 'CRITICAL'
+                    AND a.severity = 'critical'
                 """)
             ).scalar_one()
 
