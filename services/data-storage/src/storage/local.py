@@ -640,7 +640,7 @@ class LocalStorage(StorageBackend):
 
             active_devices = session.execute(
                 text("""
-                    SELECT COUNT(DISTINCT patient_id)
+                    SELECT COUNT(DISTINCT wristband_id)
                     FROM WRISTBAND_ASSIGNMENT
                     WHERE end_date IS NULL
                 """)
