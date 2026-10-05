@@ -6,6 +6,8 @@ from sqlalchemy import (
     Float,
     ForeignKey,
     CheckConstraint,
+    Index,
+    text,
 )
 from storage.base import Base
 from datetime import datetime, timezone
@@ -50,6 +52,21 @@ class Patient(Base):
 
 class WristbandAssignment(Base):
     __tablename__ = "WRISTBAND_ASSIGNMENT"
+
+    __table_args__ = (
+        Index(
+            "uq_active_assignment_wristband",
+            "wristband_id",
+            unique=True,
+            sqlite_where=text("end_date IS NULL"),
+        ),
+        Index(
+            "uq_active_assignment_patient",
+            "patient_id",
+            unique=True,
+            sqlite_where=text("end_date IS NULL"),
+        ),
+    )
 
     assignment_id = Column(Integer, primary_key=True, autoincrement=True)
     wristband_id = Column(

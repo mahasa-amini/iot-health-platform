@@ -3,6 +3,7 @@ from pathlib import Path
 
 import pytest
 from sqlalchemy import create_engine, text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import sessionmaker
 
 
@@ -247,3 +248,98 @@ def test_create_patient_commits_patient_and_wristband_together(isolated_storage)
         session.close()
 
     assert row == ("New Patient", 1)
+
+
+def test_database_rejects_two_active_assignments_for_same_wristband(
+    isolated_storage,
+):
+    _, SessionLocal = isolated_storage
+
+    session = SessionLocal()
+    try:
+        session.execute(
+            text("""
+                INSERT INTO WRISTBAND (wristband_id, created_at)
+                VALUES (1, CURRENT_TIMESTAMP)
+            """)
+        )
+        session.execute(
+            text("""
+                INSERT INTO PATIENT
+                    (patient_id, name, age, gender, phone, threshold_profile)
+                VALUES
+                    (1, 'Patient One', 40, 'FEMALE', NULL, 'STANDARD'),
+                    (2, 'Patient Two', 50, 'MALE', NULL, 'STANDARD')
+            """)
+        )
+        session.execute(
+            text("""
+                INSERT INTO WRISTBAND_ASSIGNMENT
+                    (wristband_id, patient_id, start_date, end_date)
+                VALUES
+                    (1, 1, CURRENT_TIMESTAMP, NULL)
+            """)
+        )
+        session.commit()
+
+        with pytest.raises(IntegrityError):
+            session.execute(
+                text("""
+                    INSERT INTO WRISTBAND_ASSIGNMENT
+                        (wristband_id, patient_id, start_date, end_date)
+                    VALUES
+                        (1, 2, CURRENT_TIMESTAMP, NULL)
+                """)
+            )
+            session.commit()
+    finally:
+        session.rollback()
+        session.close()
+
+
+def test_database_rejects_two_active_wristbands_for_same_patient(
+    isolated_storage,
+):
+    _, SessionLocal = isolated_storage
+
+    session = SessionLocal()
+    try:
+        session.execute(
+            text("""
+                INSERT INTO WRISTBAND (wristband_id, created_at)
+                VALUES
+                    (1, CURRENT_TIMESTAMP),
+                    (2, CURRENT_TIMESTAMP)
+            """)
+        )
+        session.execute(
+            text("""
+                INSERT INTO PATIENT
+                    (patient_id, name, age, gender, phone, threshold_profile)
+                VALUES
+                    (1, 'Patient One', 40, 'FEMALE', NULL, 'STANDARD')
+            """)
+        )
+        session.execute(
+            text("""
+                INSERT INTO WRISTBAND_ASSIGNMENT
+                    (wristband_id, patient_id, start_date, end_date)
+                VALUES
+                    (1, 1, CURRENT_TIMESTAMP, NULL)
+            """)
+        )
+        session.commit()
+
+        with pytest.raises(IntegrityError):
+            session.execute(
+                text("""
+                    INSERT INTO WRISTBAND_ASSIGNMENT
+                        (wristband_id, patient_id, start_date, end_date)
+                    VALUES
+                        (2, 1, CURRENT_TIMESTAMP, NULL)
+                """)
+            )
+            session.commit()
+    finally:
+        session.rollback()
+        session.close()
