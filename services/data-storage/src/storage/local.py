@@ -267,6 +267,36 @@ class LocalStorage(StorageBackend):
     def assign_wristband(self, patient_id: int, wristband_id: int) -> None:
         session = SessionLocal()
         try:
+            existing = session.execute(
+                text("""
+                    SELECT assignment_id
+                    FROM WRISTBAND_ASSIGNMENT
+                    WHERE wristband_id = :wristband_id
+                      AND end_date IS NULL
+                """),
+                {"wristband_id": wristband_id},
+            ).first()
+
+            if existing:
+                raise ValueError(
+                    f"Wristband {wristband_id} is already assigned"
+                )
+
+            existing_patient_assignment = session.execute(
+                text("""
+                    SELECT assignment_id
+                    FROM WRISTBAND_ASSIGNMENT
+                    WHERE patient_id = :patient_id
+                      AND end_date IS NULL
+                """),
+                {"patient_id": patient_id},
+            ).first()
+
+            if existing_patient_assignment:
+                raise ValueError(
+                    f"Patient {patient_id} already has an active wristband"
+                )
+
             session.execute(
                 text("""
                     INSERT INTO WRISTBAND_ASSIGNMENT (
