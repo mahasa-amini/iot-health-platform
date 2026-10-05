@@ -162,19 +162,24 @@ def test_dashboard_patients_in_risk_counts_lowercase_critical_alert(tmp_path, mo
 
         conn.execute(text("""
             INSERT INTO PATIENT (patient_id, name)
-            VALUES (1, 'Patient 1')
+            VALUES
+                (1, 'Patient 1'),
+                (2, 'Patient 2')
         """))
 
         conn.execute(text("""
             INSERT INTO WRISTBAND (wristband_id)
-            VALUES (1)
+            VALUES
+                (1),
+                (2)
         """))
 
         conn.execute(text("""
             INSERT INTO WRISTBAND_ASSIGNMENT
                 (assignment_id, wristband_id, patient_id, start_date, end_date)
             VALUES
-                (1, 1, 1, CURRENT_TIMESTAMP, NULL)
+                (1, 1, 1, CURRENT_TIMESTAMP, NULL),
+                (2, 2, 2, CURRENT_TIMESTAMP, NULL)
         """))
 
         conn.execute(text("""
@@ -187,20 +192,31 @@ def test_dashboard_patients_in_risk_counts_lowercase_critical_alert(tmp_path, mo
                 generated_at,
                 status
             )
-            VALUES (
-                1,
-                1,
-                'critical',
-                'THRESHOLD_BREACH',
-                'Critical test alert',
-                CURRENT_TIMESTAMP,
-                'JUST_GENERATED'
-            )
+            VALUES
+                (
+                    1,
+                    1,
+                    'critical',
+                    'THRESHOLD_BREACH',
+                    'Active critical alert',
+                    CURRENT_TIMESTAMP,
+                    'JUST_GENERATED'
+                ),
+                (
+                    2,
+                    2,
+                    'critical',
+                    'THRESHOLD_BREACH',
+                    'Closed critical alert',
+                    CURRENT_TIMESTAMP,
+                    'CLOSED'
+                )
         """))
 
     result = local.LocalStorage().get_dashboard_overview()
 
     assert result["stats"]["patients_in_risk"] == 1
+    assert result["system_overview"]["active_alerts"] == 1
 
 
 def test_count_critical_alerts_counts_lowercase_critical(tmp_path, monkeypatch):
@@ -231,7 +247,10 @@ def test_count_critical_alerts_counts_lowercase_critical(tmp_path, monkeypatch):
             INSERT INTO ALERT (alert_id, severity, status)
             VALUES
                 (1, 'critical', 'JUST_GENERATED'),
-                (2, 'warning', 'JUST_GENERATED')
+                (2, 'warning', 'JUST_GENERATED'),
+                (3, 'critical', 'ACKNOWLEDGED'),
+                (4, 'critical', 'CLINICALLY_ASSESSED'),
+                (5, 'critical', 'CLOSED')
         """))
 
     result = local.LocalStorage().count_critical_alerts()
@@ -274,3 +293,247 @@ def test_dashboard_response_accepts_lowercase_alert_severity(severity):
     result = DashboardOverviewResponse.model_validate(payload)
 
     assert result.recent_alerts[0].severity.value == severity
+
+
+def test_count_active_alerts_counts_only_just_generated(tmp_path, monkeypatch):
+    db_path = tmp_path / "active-alerts.db"
+
+    engine = create_engine(
+        f"sqlite:///{db_path}",
+        connect_args={"check_same_thread": False},
+    )
+    TestSessionLocal = sessionmaker(
+        bind=engine,
+        autoflush=False,
+        autocommit=False,
+    )
+
+    monkeypatch.setattr(local, "SessionLocal", TestSessionLocal)
+
+    with engine.begin() as conn:
+        conn.execute(text("""
+            CREATE TABLE ALERT (
+                alert_id INTEGER PRIMARY KEY,
+                status TEXT
+            )
+        """))
+
+        conn.execute(text("""
+            INSERT INTO ALERT (alert_id, status)
+            VALUES
+                (1, 'JUST_GENERATED'),
+                (2, 'ACKNOWLEDGED'),
+                (3, 'CLINICALLY_ASSESSED'),
+                (4, 'CLOSED')
+        """))
+
+    result = local.LocalStorage().count_active_alerts()
+
+    assert result == 1
+
+
+def test_patient_overview_ignores_closed_alert(tmp_path, monkeypatch):
+    db_path = tmp_path / "patient-overview-alert.db"
+
+    engine = create_engine(
+        f"sqlite:///{db_path}",
+        connect_args={"check_same_thread": False},
+    )
+    TestSessionLocal = sessionmaker(
+        bind=engine,
+        autoflush=False,
+        autocommit=False,
+    )
+
+    monkeypatch.setattr(local, "SessionLocal", TestSessionLocal)
+
+    with engine.begin() as conn:
+        conn.execute(text("""
+            CREATE TABLE PATIENT (
+                patient_id INTEGER PRIMARY KEY,
+                name TEXT,
+                age INTEGER,
+                gender TEXT,
+                phone TEXT
+            )
+        """))
+
+        conn.execute(text("""
+            CREATE TABLE WRISTBAND (
+                wristband_id INTEGER PRIMARY KEY
+            )
+        """))
+
+        conn.execute(text("""
+            CREATE TABLE WRISTBAND_ASSIGNMENT (
+                assignment_id INTEGER PRIMARY KEY,
+                wristband_id INTEGER NOT NULL,
+                patient_id INTEGER NOT NULL,
+                start_date DATETIME,
+                end_date DATETIME
+            )
+        """))
+
+        conn.execute(text("""
+            CREATE TABLE VITAL_MEASUREMENT (
+                measurement_id INTEGER PRIMARY KEY,
+                assignment_id INTEGER NOT NULL,
+                measured_at DATETIME,
+                heart_rate REAL,
+                spo2 REAL,
+                temperature REAL,
+                battery_level INTEGER
+            )
+        """))
+
+        conn.execute(text("""
+            CREATE TABLE ALERT (
+                alert_id INTEGER PRIMARY KEY,
+                assignment_id INTEGER NOT NULL,
+                severity TEXT,
+                generated_at DATETIME,
+                status TEXT
+            )
+        """))
+
+        conn.execute(text("""
+            INSERT INTO PATIENT (patient_id, name)
+            VALUES (1, 'Patient 1')
+        """))
+
+        conn.execute(text("""
+            INSERT INTO WRISTBAND (wristband_id)
+            VALUES (1)
+        """))
+
+        conn.execute(text("""
+            INSERT INTO WRISTBAND_ASSIGNMENT
+                (assignment_id, wristband_id, patient_id, start_date, end_date)
+            VALUES
+                (1, 1, 1, CURRENT_TIMESTAMP, NULL)
+        """))
+
+        conn.execute(text("""
+            INSERT INTO ALERT (
+                alert_id,
+                assignment_id,
+                severity,
+                generated_at,
+                status
+            )
+            VALUES (
+                1,
+                1,
+                'critical',
+                CURRENT_TIMESTAMP,
+                'CLOSED'
+            )
+        """))
+
+    result = local.LocalStorage().get_patient_overview(1)
+
+    assert result is not None
+    assert result["latest_alert_severity"] is None
+
+
+def test_patients_overview_ignores_closed_alert(tmp_path, monkeypatch):
+    db_path = tmp_path / "patients-overview-alert.db"
+
+    engine = create_engine(
+        f"sqlite:///{db_path}",
+        connect_args={"check_same_thread": False},
+    )
+    TestSessionLocal = sessionmaker(
+        bind=engine,
+        autoflush=False,
+        autocommit=False,
+    )
+
+    monkeypatch.setattr(local, "SessionLocal", TestSessionLocal)
+
+    with engine.begin() as conn:
+        conn.execute(text("""
+            CREATE TABLE PATIENT (
+                patient_id INTEGER PRIMARY KEY,
+                name TEXT,
+                age INTEGER,
+                gender TEXT,
+                phone TEXT
+            )
+        """))
+
+        conn.execute(text("""
+            CREATE TABLE WRISTBAND (
+                wristband_id INTEGER PRIMARY KEY
+            )
+        """))
+
+        conn.execute(text("""
+            CREATE TABLE WRISTBAND_ASSIGNMENT (
+                assignment_id INTEGER PRIMARY KEY,
+                wristband_id INTEGER NOT NULL,
+                patient_id INTEGER NOT NULL,
+                start_date DATETIME,
+                end_date DATETIME
+            )
+        """))
+
+        conn.execute(text("""
+            CREATE TABLE VITAL_MEASUREMENT (
+                measurement_id INTEGER PRIMARY KEY,
+                assignment_id INTEGER NOT NULL,
+                measured_at DATETIME,
+                heart_rate REAL,
+                spo2 REAL,
+                temperature REAL,
+                battery_level INTEGER
+            )
+        """))
+
+        conn.execute(text("""
+            CREATE TABLE ALERT (
+                alert_id INTEGER PRIMARY KEY,
+                assignment_id INTEGER NOT NULL,
+                severity TEXT,
+                generated_at DATETIME,
+                status TEXT
+            )
+        """))
+
+        conn.execute(text("""
+            INSERT INTO PATIENT (patient_id, name)
+            VALUES (1, 'Patient 1')
+        """))
+
+        conn.execute(text("""
+            INSERT INTO WRISTBAND (wristband_id)
+            VALUES (1)
+        """))
+
+        conn.execute(text("""
+            INSERT INTO WRISTBAND_ASSIGNMENT
+                (assignment_id, wristband_id, patient_id, start_date, end_date)
+            VALUES (1, 1, 1, CURRENT_TIMESTAMP, NULL)
+        """))
+
+        conn.execute(text("""
+            INSERT INTO ALERT (
+                alert_id,
+                assignment_id,
+                severity,
+                generated_at,
+                status
+            )
+            VALUES (
+                1,
+                1,
+                'critical',
+                CURRENT_TIMESTAMP,
+                'CLOSED'
+            )
+        """))
+
+    result = local.LocalStorage().get_patients_overview()
+
+    assert len(result) == 1
+    assert result[0]["latest_alert_severity"] is None

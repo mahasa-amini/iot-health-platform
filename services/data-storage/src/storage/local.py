@@ -122,12 +122,12 @@ class LocalStorage(StorageBackend):
                         )
                     LEFT JOIN ALERT la
                         ON la.assignment_id = wa.assignment_id
-                        AND la.status != 'ACKNOWLEDGED'
+                        AND la.status = 'JUST_GENERATED'
                         AND la.generated_at = (
                             SELECT MAX(a2.generated_at)
                             FROM ALERT a2
                             WHERE a2.assignment_id = wa.assignment_id
-                              AND a2.status != 'ACKNOWLEDGED'
+                              AND a2.status = 'JUST_GENERATED'
                         )
                     ORDER BY p.name
                 """)
@@ -179,12 +179,12 @@ class LocalStorage(StorageBackend):
                         )
                     LEFT JOIN ALERT la
                         ON la.assignment_id = wa.assignment_id
-                        AND la.status != 'ACKNOWLEDGED'
+                        AND la.status = 'JUST_GENERATED'
                         AND la.generated_at = (
                             SELECT MAX(a2.generated_at)
                             FROM ALERT a2
                             WHERE a2.assignment_id = wa.assignment_id
-                              AND a2.status != 'ACKNOWLEDGED'
+                              AND a2.status = 'JUST_GENERATED'
                         )
                     WHERE p.patient_id = :patient_id
                 """),
@@ -624,7 +624,7 @@ class LocalStorage(StorageBackend):
                 text("""
                     SELECT COUNT(*)
                     FROM ALERT
-                    WHERE status != 'ACKNOWLEDGED'
+                    WHERE status = 'JUST_GENERATED'
                 """)
             )
             return result.scalar_one()
@@ -638,7 +638,7 @@ class LocalStorage(StorageBackend):
                 text("""
                     SELECT COUNT(*)
                     FROM ALERT
-                    WHERE status != 'ACKNOWLEDGED'
+                    WHERE status = 'JUST_GENERATED'
                     AND severity = 'critical'
                 """)
             )
@@ -690,7 +690,7 @@ class LocalStorage(StorageBackend):
                 text("""
                     SELECT COUNT(*)
                     FROM ALERT
-                    WHERE status != 'ACKNOWLEDGED'
+                    WHERE status = 'JUST_GENERATED'
                 """)
             ).scalar_one()
 
@@ -700,7 +700,7 @@ class LocalStorage(StorageBackend):
                     FROM ALERT a
                     JOIN WRISTBAND_ASSIGNMENT wa
                         ON a.assignment_id = wa.assignment_id
-                    WHERE a.status != 'ACKNOWLEDGED'
+                    WHERE a.status = 'JUST_GENERATED'
                     AND a.severity = 'critical'
                 """)
             ).scalar_one()
