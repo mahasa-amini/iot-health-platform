@@ -63,5 +63,5 @@ def create_patient(payload: PatientCreateRequest) -> Dict:
     try:
         patient = storage.create_patient(payload.dict())
         return patient
-    except Exception as e:
+    except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
