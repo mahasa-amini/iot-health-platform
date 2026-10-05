@@ -61,7 +61,7 @@ def get_patient_alerts(patient_id: int) -> Dict:
 )
 def create_patient(payload: PatientCreateRequest) -> Dict:
     try:
-        patient = storage.create_patient(payload.dict())
+        patient = storage.create_patient(payload.model_dump())
         return patient
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
