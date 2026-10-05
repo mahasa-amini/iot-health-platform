@@ -1,5 +1,5 @@
-from storage.base import Base
 from storage.local import engine
+from schema import initialize_schema
 import models  # noqa: F401  (register SQLAlchemy models)
 
 from mqtt_client import start_mqtt
@@ -16,7 +16,7 @@ import uvicorn
 # Database initialization
 # ----------------------------
 def init_db():
-    Base.metadata.create_all(bind=engine)
+    initialize_schema(engine)
 
 
 # ----------------------------
