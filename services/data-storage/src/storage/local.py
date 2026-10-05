@@ -651,7 +651,7 @@ class LocalStorage(StorageBackend):
         try:
             result = session.execute(
                 text("""
-                    SELECT COUNT(*)
+                    SELECT COUNT(DISTINCT wa.wristband_id)
                     FROM WRISTBAND_ASSIGNMENT wa
                     JOIN VITAL_MEASUREMENT vm
                     ON wa.assignment_id = vm.assignment_id
@@ -707,7 +707,7 @@ class LocalStorage(StorageBackend):
 
             low_battery_devices = session.execute(
                 text("""
-                    SELECT COUNT(*)
+                    SELECT COUNT(DISTINCT wa.wristband_id)
                     FROM WRISTBAND_ASSIGNMENT wa
                     JOIN VITAL_MEASUREMENT vm
                         ON wa.assignment_id = vm.assignment_id

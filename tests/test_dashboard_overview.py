@@ -537,3 +537,99 @@ def test_patients_overview_ignores_closed_alert(tmp_path, monkeypatch):
 
     assert len(result) == 1
     assert result[0]["latest_alert_severity"] is None
+
+
+def test_dashboard_low_battery_counts_device_once_when_latest_timestamp_ties(
+    tmp_path, monkeypatch
+):
+    db_path = tmp_path / "low-battery-timestamp-tie.db"
+
+    engine = create_engine(
+        f"sqlite:///{db_path}",
+        connect_args={"check_same_thread": False},
+    )
+    TestSessionLocal = sessionmaker(
+        bind=engine,
+        autoflush=False,
+        autocommit=False,
+    )
+
+    monkeypatch.setattr(local, "SessionLocal", TestSessionLocal)
+
+    with engine.begin() as conn:
+        conn.execute(text("""
+            CREATE TABLE PATIENT (
+                patient_id INTEGER PRIMARY KEY,
+                name TEXT
+            )
+        """))
+
+        conn.execute(text("""
+            CREATE TABLE WRISTBAND (
+                wristband_id INTEGER PRIMARY KEY
+            )
+        """))
+
+        conn.execute(text("""
+            CREATE TABLE WRISTBAND_ASSIGNMENT (
+                assignment_id INTEGER PRIMARY KEY,
+                wristband_id INTEGER NOT NULL,
+                patient_id INTEGER NOT NULL,
+                start_date DATETIME,
+                end_date DATETIME
+            )
+        """))
+
+        conn.execute(text("""
+            CREATE TABLE VITAL_MEASUREMENT (
+                measurement_id INTEGER PRIMARY KEY,
+                assignment_id INTEGER NOT NULL,
+                measured_at DATETIME,
+                battery_level INTEGER
+            )
+        """))
+
+        conn.execute(text("""
+            CREATE TABLE ALERT (
+                alert_id INTEGER PRIMARY KEY,
+                assignment_id INTEGER,
+                severity TEXT,
+                alert_type TEXT,
+                description TEXT,
+                generated_at DATETIME,
+                status TEXT
+            )
+        """))
+
+        conn.execute(text("""
+            INSERT INTO PATIENT (patient_id, name)
+            VALUES (1, 'Patient 1')
+        """))
+
+        conn.execute(text("""
+            INSERT INTO WRISTBAND (wristband_id)
+            VALUES (1)
+        """))
+
+        conn.execute(text("""
+            INSERT INTO WRISTBAND_ASSIGNMENT
+                (assignment_id, wristband_id, patient_id, start_date, end_date)
+            VALUES
+                (1, 1, 1, CURRENT_TIMESTAMP, NULL)
+        """))
+
+        conn.execute(text("""
+            INSERT INTO VITAL_MEASUREMENT
+                (measurement_id, assignment_id, measured_at, battery_level)
+            VALUES
+                (1, 1, '2026-01-01 12:00:00', 20),
+                (2, 1, '2026-01-01 12:00:00', 25)
+        """))
+
+    storage = local.LocalStorage()
+
+    dashboard = storage.get_dashboard_overview()
+    low_battery_count = storage.count_low_battery_devices(threshold=30)
+
+    assert dashboard["stats"]["low_battery_devices"] == 1
+    assert low_battery_count == 1
