@@ -1,5 +1,4 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-import sqlite3
 
 from app.models.schemas import WristbandCreateRequest, WristbandCreateResponse
 from app.services.container import get_storage
@@ -32,11 +31,10 @@ def create_wristband_api(
     """
     try:
         return create_wristband(db, payload.wristband_id)
-    except sqlite3.IntegrityError:
-        # Duplicate wristband_id (primary key)
+    except ValueError as e:
         raise HTTPException(
             status_code=409,
-            detail="Wristband ID already exists.",
+            detail=str(e),
         )
 
 @router.get(

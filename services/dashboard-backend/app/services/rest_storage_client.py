@@ -133,6 +133,10 @@ class RESTStorageClient(Storage):
             json={"wristband_id": wristband_id},
             timeout=5
         )
+
+        if resp.status_code == 409:
+            raise ValueError("Wristband ID already exists.")
+
         resp.raise_for_status()
         return resp.json()
 

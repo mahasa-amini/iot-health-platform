@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException
+from sqlalchemy.exc import IntegrityError
 from storage.local import LocalStorage
 from api.schemas import WristbandCreateRequest
 
@@ -18,7 +19,13 @@ def get_available_wristbands():
 
 @router.post("/wristbands")
 def create_wristband(payload: WristbandCreateRequest):
-    return storage.create_wristband(payload.wristband_id)
+    try:
+        return storage.create_wristband(payload.wristband_id)
+    except IntegrityError:
+        raise HTTPException(
+            status_code=409,
+            detail="Wristband ID already exists.",
+        )
 
 @router.post("/{wristband_id}/unassign")
 def unassign_wristband(wristband_id: int):
