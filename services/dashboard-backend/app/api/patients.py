@@ -52,7 +52,10 @@ def create_patient_api(
     Create patient (and optional wristband assignment).
     Assignment is handled inside Data Storage Service.
     """
-    return create_patient(db, payload.model_dump())
+    try:
+        return create_patient(db, payload.model_dump())
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.get(

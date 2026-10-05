@@ -49,6 +49,10 @@ class RESTStorageClient(Storage):
             json=data,
             timeout=5,
         )
+        if resp.status_code == 400:
+            detail = resp.json().get("detail", "Invalid patient data")
+            raise ValueError(detail)
+
         resp.raise_for_status()
         return resp.json()
 
