@@ -1,6 +1,8 @@
 import sys
 from pathlib import Path
 
+import pytest
+
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 
@@ -235,3 +237,40 @@ def test_count_critical_alerts_counts_lowercase_critical(tmp_path, monkeypatch):
     result = local.LocalStorage().count_critical_alerts()
 
     assert result == 1
+
+
+@pytest.mark.parametrize("severity", ["warning", "critical"])
+def test_dashboard_response_accepts_lowercase_alert_severity(severity):
+    dashboard_backend = ROOT / "services" / "dashboard-backend"
+    sys.path.insert(0, str(dashboard_backend))
+
+    from app.models.schemas import DashboardOverviewResponse
+
+    payload = {
+        "system_overview": {
+            "active_devices": 1,
+            "patients_monitored": 1,
+            "active_alerts": 1,
+            "last_update": "2026-01-01T00:00:00Z",
+        },
+        "stats": {
+            "patients_in_risk": 1,
+            "low_battery_devices": 0,
+        },
+        "recent_alerts": [
+            {
+                "alert_id": 1,
+                "severity": severity,
+                "alert_type": "THRESHOLD_BREACH",
+                "description": "Critical test alert",
+                "device_id": "WB-1",
+                "generated_at": "2026-01-01T00:00:00Z",
+                "acknowledged": False,
+                "patient_name": "Patient 1",
+            }
+        ],
+    }
+
+    result = DashboardOverviewResponse.model_validate(payload)
+
+    assert result.recent_alerts[0].severity.value == severity

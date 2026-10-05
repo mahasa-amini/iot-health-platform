@@ -50,8 +50,8 @@ class AlertSeverity(str, Enum):
 
     شدت هشدار (میزان بحرانی بودن)
     """
-    WARNING = "WARNING"
-    CRITICAL = "CRITICAL"
+    WARNING = "warning"
+    CRITICAL = "critical"
 
 
 class AlertStatus(str, Enum):
