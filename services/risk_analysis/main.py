@@ -117,11 +117,21 @@ def on_message(client, userdata, msg):
     breached_value = None
 
     # 2️⃣ Evaluate all vitals
+    metric_aliases = {
+        "heart_rate": "hr",
+        "battery_level": "battery",
+    }
+
     for metric, value in payload.items():
-        if metric not in profile_thresholds or value is None:
+        threshold_metric = metric_aliases.get(metric, metric)
+
+        if threshold_metric not in profile_thresholds or value is None:
             continue
 
-        severity = resolve_severity(value, profile_thresholds[metric])
+        severity = resolve_severity(
+            value,
+            profile_thresholds[threshold_metric],
+        )
 
         if severity == "CRITICAL":
             highest_severity = "CRITICAL"
