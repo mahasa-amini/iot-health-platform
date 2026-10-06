@@ -1,124 +1,183 @@
-# iot-health-platform
-IoT Platform for Smart Health Monitoring (Course Project)
-#  IoT Health Monitoring Platform
+# IoT Health Monitoring Platform
 
-A modular, scalable **IoT-based health monitoring system** for real-time patient vitals tracking, alert management, and clinical dashboards.
+A containerized, event-driven IoT health monitoring platform for collecting wearable vital signs, applying profile-specific risk rules, persisting clinical events, and exposing dashboard-oriented APIs.
 
----
+Originally developed as a course project, this repository has since been hardened with reproducible database initialization, assignment-integrity constraints, regression tests, runtime configuration, and end-to-end verification of the MQTT alert pipeline.
 
-##  Overview
+## Architecture
 
-This project implements a **distributed microservice architecture** designed to monitor patients using wearable wristbands.  
-It supports real-time vital collection, alert lifecycle management, and UI-ready dashboards.
-
-The system is composed of **6 main layers**:
-
-- **UI (Frontend)** – Clinician dashboard
-- **Dashboard Backend API** – UI-oriented orchestration
-- **Data Storage Service** – Database & domain logic
-- **MQTT BROKER** - Broker as a Hub for Payloads
-- **Risk Analysis** - Creating Risk Events Based On Profiles and Vital Payloads
-- **Alert Notification** - Managing Alerts
-- **Health Catalog** - Source Of Truth In Configuration Area
-
----
-
-##  High-Level Architecture
+The platform is composed of independent Python services connected through REST and MQTT.
 
 ```mermaid
 flowchart LR
-    UI[UI / Frontend]
-    DBE[Dashboard Backend API]
-    DS[Data Storage Service]
-    RA[Risk Analysis Service]
-    AL[Alert Notification Service]
-    BR[Broker]
-    WRS[Wristband Simulator]
-    DB[Data Base]
-    H[Health Catalog]
+    SIM[Wristband Simulator]
+    MQTT[Eclipse Mosquitto]
+    RA[Risk Analysis]
+    AN[Alert Notification]
+    DS[Data Storage]
+    DB[(SQLite)]
+    HC[Health Catalog]
+    API[Dashboard Backend]
+    UI[Dashboard UI]
 
-    UI -->|REST & WS| DBE
-    DBE -->|REST| DS
-    DS -->|REST| DBE
+    SIM -->|fetch active assignments| DS
+    SIM -->|vital events| MQTT
+
+    MQTT -->|vitals| DS
+    MQTT -->|vitals| RA
+    MQTT -->|vitals / alerts| API
+
+    RA -->|resolve assignment/profile| DS
+    RA -->|risk events| MQTT
+
+    MQTT -->|risk events| AN
+    AN -->|final alerts| MQTT
+
+    MQTT -->|alerts| DS
+
     DS --> DB
-    H -->|REST| DS
-    H -->|REST| DBE
-    H -->|REST| RA
-    H -->|REST| AL
-    RA -->|MQTT| AL
-    AL -->|MQTT| DS
-    AL -->|MQTT| DBE
-    WRS -->|MQTT| BR
-    BR -->|MQTT| DBE
-    BR -->|MQTT| DS
-    BR -->|MQTT| RA
+
+    HC -->|thresholds / MQTT / environment config| RA
+    HC -->|alert / MQTT / environment config| AN
+    HC -->|runtime config| DS
+    HC -->|runtime config| API
+
+    API -->|REST| DS
+    UI -->|REST / WebSocket| API
 ```
-##  Design Principle
 
-Dashboard Backend never accesses the database directly.  
-All persistence and domain logic live exclusively in Data Storage.
+## Runtime Services
 
----
+| Service | Role | Host Port |
+| --- | --- | ---: |
+| Dashboard Backend | REST/WebSocket API for dashboard clients | `8000` |
+| Health Catalog | Runtime configuration and threshold profiles | `8001` |
+| Data Storage | Persistence and domain logic | `8003` |
+| MQTT Broker | Eclipse Mosquitto event transport | `1883` |
+| Risk Analysis | Profile-based vital evaluation | internal |
+| Alert Notification | Risk-event to alert transformation | internal |
+| Wristband Simulator | Local telemetry generator | internal |
 
-##  Services Description
+## End-to-End Flow
 
-###  UI (Frontend)
+1. Wristband Simulator retrieves active assignments from Data Storage.
+2. Vitals are published to `wristbands/{wristband_id}/vitals`.
+3. Data Storage resolves the active assignment and persists the measurement.
+4. Risk Analysis receives the same event and resolves the patient's threshold profile.
+5. Profile-specific thresholds from Health Catalog are evaluated.
+6. Warning or critical breaches become risk events.
+7. Alert Notification converts risk events into final alert payloads.
+8. Data Storage resolves the wristband back to its active assignment and persists the alert.
+9. Dashboard Backend exposes persisted and live information to clients.
 
-Consumes REST APIs from Dashboard Backend.
+The complete pipeline has been verified with a controlled Docker E2E test using a `CARDIAC` profile and a critical heart-rate event.
 
-Displays:
+## Core Services
 
-- Patients & details  
-- Live vitals  
-- Alerts & acknowledgments  
-- Wristband management  
+### Dashboard Backend
 
----
+FastAPI orchestration layer for dashboard clients.
 
-###  Dashboard Backend (FastAPI)
+Main route groups:
 
-**Role:** UI-oriented orchestration layer
+- `/patients`
+- `/vitals`
+- `/alerts`
+- `/dashboard`
+- `/wristbands`
+- `/ws`
 
-**Responsibilities:**
+It retrieves persisted domain data from Data Storage and subscribes to MQTT vital and alert streams for real-time delivery.
 
-- Aggregate data into UI-ready structures  
-- Transform domain data → presentation models  
-- Handle endpoints:
-  - `/dashboard/overview`
-  - `/patients`
-  - `/vitals`
-  - `/alerts`
-  - `/wristbands`
+### Data Storage
 
-**Does NOT:**
+FastAPI + SQLAlchemy service responsible for persistence and domain consistency.
 
-- Store data  
-- Run SQL  
-- Generate timestamps for persistence  
+REST endpoints are exposed under `/api/v1`.
 
----
+Responsibilities include:
 
-### Data Storage Service (FastAPI + SQLAlchemy)
+- patient management
+- wristband management
+- active assignment resolution
+- vital measurement persistence
+- alert persistence and lifecycle updates
+- dashboard aggregation
+- database initialization
+- deterministic demo seeding
+- assignment-integrity enforcement
 
-**Role:** Single source of truth
+The current runtime database is SQLite at `data/health.db`.
 
-**Responsibilities:**
+The runtime database is generated locally and is not treated as version-controlled application state.
 
-- Database access & transactions  
-- Domain consistency  
-- Alert lifecycle management  
-- Assignment integrity  
+### Health Catalog
 
-**Generates internally:**
+Central configuration service for:
 
-- `created_at`  
-- `generated_at`  
-- `acknowledged_at`  
-- `start_date` / `end_date`  
+- threshold profiles
+- MQTT topics
+- alert configuration
+- runtime environments
+- service registry information
 
----
+Important configuration endpoints include:
 
-## Database Schema (ERD)
+- `/config/thresholds/`
+- `/config/mqtt/topics`
+- `/config/alerts/`
+- `/config/environments/`
+- `/registry/services/`
+
+Threshold profiles currently include:
+
+- `STANDARD`
+- `CARDIAC`
+- `ELDERLY`
+- `RESPIRATORY_RISK`
+- `HIGH_RISK`
+
+### Risk Analysis
+
+Consumes wearable vital events and evaluates them against the threshold profile associated with the active wristband assignment.
+
+Supported threshold dimensions include:
+
+- heart rate
+- SpO2
+- temperature
+- battery level
+
+The telemetry contract uses fields such as `heart_rate` and `battery_level`, while Health Catalog uses canonical threshold keys such as `hr` and `battery`. Risk Analysis maps these contracts before evaluation.
+
+### Alert Notification
+
+Consumes risk events and produces final alert payloads containing:
+
+- severity
+- lifecycle status
+- threshold profile
+- breached metric
+- measured value
+- generated timestamp
+- human-readable descriptions
+
+Final alerts are published through MQTT and persisted by Data Storage.
+
+### Wristband Simulator
+
+Simulates wearable devices for active assignments.
+
+Generated telemetry includes:
+
+- heart rate
+- SpO2
+- temperature
+- motion
+- battery level
+- measurement timestamp
+
+## Domain Model
 
 ```mermaid
 erDiagram
@@ -176,36 +235,147 @@ erDiagram
     }
 ```
 
+The assignment entity is central to the model: measurements and alerts belong to the patient-device assignment active at the time of the event.
 
-##  Key Design Decisions
+## Integrity and Reliability
 
-- Strict service boundaries  
-- No shared database access  
-- UI schemas isolated from DB schemas  
-- All timestamps generated server-side  
-- Assignments guarantee medical correctness  
-- REST-first architecture  
+The backend includes:
 
----
+- database-level uniqueness for active patient and wristband assignments
+- application-level assignment validation
+- atomic patient creation and initial wristband assignment
+- HTTP conflict handling for duplicate wristbands
+- active-assignment resolution before storing vitals or alerts
+- schema initialization for existing SQLite databases
+- deterministic demo seed data for empty databases
+- profile-specific health thresholds
+- timezone-aware UTC event timestamps
+- persisted creation timestamps returned from the database
+- environment-configurable internal service URLs
+- health-aware Docker Compose dependencies
+- regression coverage for previously identified defects
 
-##  Tech Stack
+## Quick Start
 
-- **FastAPI** – REST APIs  
-- **SQLAlchemy** – ORM  
-- **PostgreSQL / SQLite**  
-- **MQTT** – IoT ingestion  
-- **Docker & Docker Compose**  
-- **Pydantic** – Validation  
-- **Uvicorn** – ASGI server  
+### Requirements
 
----
+- Docker
+- Docker Compose
 
-##  Features
+The service images use Python 3.11.
 
-- Patient management  
-- Wristband assignment & unassignment  
-- Real-time vitals ingestion  
-- Alerts lifecycle & acknowledgment  
-- Dashboard overview & stats  
-- Low battery detection  
-- Clean microservice architecture  
+### Start the platform
+
+From the repository root:
+
+```bash
+docker compose -f deployment/docker-compose.yml up -d --build
+```
+
+Check service state:
+
+```bash
+docker compose -f deployment/docker-compose.yml ps
+```
+
+Primary local endpoints:
+
+- Dashboard Backend: `http://localhost:8000`
+- Health Catalog: `http://localhost:8001`
+- Data Storage: `http://localhost:8003`
+- MQTT Broker: `localhost:1883`
+
+FastAPI interactive documentation:
+
+- `http://localhost:8000/docs`
+- `http://localhost:8001/docs`
+- `http://localhost:8003/docs`
+
+Stop the platform with:
+
+```bash
+docker compose -f deployment/docker-compose.yml down
+```
+
+## Testing
+
+The regression suite covers:
+
+- active assignment integrity
+- database schema upgrades
+- MQTT callback compatibility
+- timestamp handling
+- dashboard aggregation
+- patient and wristband API error propagation
+- alert acknowledgement behavior
+- service URL configuration
+- deterministic database seeding
+- risk-analysis metric mapping
+
+Run the full test suite with:
+
+```bash
+pytest -q
+```
+
+A controlled Docker E2E scenario has also verified:
+
+```text
+Wristband MQTT event
+    -> Data Storage persistence
+    -> Risk Analysis
+    -> Alert Notification
+    -> MQTT alert
+    -> assignment resolution
+    -> alert persistence
+```
+
+## Repository Structure
+
+```text
+.
+├── DataBase/                     # Original ER/database design assets
+├── dashboard-ui/                 # Compiled frontend artifact
+├── deployment/
+│   ├── docker-compose.yml
+│   └── mqtt-broker/
+├── services/
+│   ├── alert_notification/
+│   ├── dashboard-backend/
+│   ├── data-storage/
+│   ├── health-catalog/
+│   ├── risk_analysis/
+│   └── wristband-simulator/
+├── tests/                        # Backend regression tests
+└── README.md
+```
+
+## Technology Stack
+
+- Python 3.11
+- FastAPI
+- SQLAlchemy
+- Pydantic
+- Uvicorn
+- Eclipse Mosquitto
+- Paho MQTT
+- SQLite
+- Docker
+- Docker Compose
+- Pytest
+
+## Project Scope
+
+This repository is currently focused on the backend and distributed-system architecture.
+
+The original course-project snapshot contains compiled dashboard assets under `dashboard-ui/dist`, but the maintainable frontend source is not present in the available repository history. Current development therefore focuses on backend architecture, domain integrity, MQTT event flow, persistence, APIs, testing, and reproducibility.
+
+## Current Status
+
+The backend has completed a focused forensic audit and controlled end-to-end integration verification.
+
+Current portfolio work focuses on:
+
+- automated CI for the regression suite
+- repository and documentation polish
+- final reproducibility and release audit
