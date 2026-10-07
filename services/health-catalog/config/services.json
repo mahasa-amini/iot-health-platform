@@ -16,20 +16,20 @@
       "name": "health-catalog",
       "type": "config-service",
       "protocols": ["REST"],
-      "base_url": "http://health-catalog:8001",
+      "base_url": "http://health-catalog:8000",
       "version": "v1"
     },
     {
       "name": "risk-analysis-service",
       "type": "backend-service",
-      "protocols": ["MQTT", "REST"],
+      "protocols": ["MQTT"],
       "base_url": null,
       "version": "v1"
     },
     {
       "name": "alert-notification-service",
       "type": "backend-service",
-      "protocols": ["MQTT", "REST"],
+      "protocols": ["MQTT"],
       "base_url": null,
       "version": "v1"
     },

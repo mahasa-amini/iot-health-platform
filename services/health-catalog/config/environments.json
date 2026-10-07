@@ -54,7 +54,7 @@
       "services": {
         "health-catalog": {
           "host": "health-catalog",
-          "port": 8001
+          "port": 8000
         },
         "risk-analysis-service": {
           "host": "risk-analysis",

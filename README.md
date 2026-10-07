@@ -314,9 +314,20 @@ The regression suite covers:
 - deterministic database seeding
 - risk-analysis metric mapping
 
-Run the full test suite with:
+For local testing, create and activate a Python 3.11 virtual environment, then install the service and test dependencies from their existing requirement files:
 
 ```bash
+python3.11 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install \
+    -r services/health-catalog/requirements.txt \
+    -r services/data-storage/requirements.txt \
+    -r services/dashboard-backend/requirements.txt \
+    -r services/risk_analysis/requirements.txt \
+    -r services/alert_notification/requirements.txt \
+    -r services/wristband-simulator/requirements.txt
+python -m pip install pytest httpx
 pytest -q
 ```
 
@@ -374,10 +385,4 @@ The original course-project snapshot contains compiled dashboard assets under `d
 
 ## Current Status
 
-The backend has completed a focused forensic audit and controlled end-to-end integration verification.
-
-Current portfolio work focuses on:
-
-- automated CI for the regression suite
-- repository and documentation polish
-- final reproducibility and release audit
+The backend forensic audit and controlled Docker end-to-end verification are complete. GitHub Actions regression CI is active and passing, and the final portfolio release audit has been completed. The repository is portfolio-ready.
