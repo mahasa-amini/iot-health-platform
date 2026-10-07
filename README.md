@@ -1,5 +1,7 @@
 # IoT Health Monitoring Platform
 
+[![Tests](https://github.com/mahasa-amini/iot-health-platform/actions/workflows/tests.yml/badge.svg)](https://github.com/mahasa-amini/iot-health-platform/actions/workflows/tests.yml)
+
 A containerized, event-driven IoT health monitoring platform for collecting wearable vital signs, applying profile-specific risk rules, persisting clinical events, and exposing dashboard-oriented APIs.
 
 Originally developed as a course project, this repository has since been hardened with reproducible database initialization, assignment-integrity constraints, regression tests, runtime configuration, and end-to-end verification of the MQTT alert pipeline.
